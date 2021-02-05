@@ -64,17 +64,81 @@ def make_prediction(net, layer_names, labels, image, confidence, threshold):
 
     return boxes, confidences, classIDs, idxs
 
-if __name__ == '__main__':
+def start_inference(selected_path,showvdo):
+    #origin_path = 'G:/.shortcut-targets-by-id/1hQoqbcLdIKP1y1vE2waDf28rLEbA3yqR/CEProject63-21ObjectDetection/colab_work/darknet/forshirt/'
+    inp = ['justshirt.names',
+    'Copyofcustom-yolov4-detector.cfg',
+    'custom-yolov4-detector_best.weights',
+    ]
+    video_path = selected_path[0]
+    confidence = 0.5
+    threshold = 0.3
+
+    # Get the labels]
+    global labels
+    labels = open(inp[0]).read().strip().split('\n')
+
+    # Create a list of colors for the labels
+    colors = np.random.randint(0, 255, size=(len(labels), 3), dtype='uint8')
+
+    # Load weights using OpenCV
+    net = cv2.dnn.readNetFromDarknet(inp[1],inp[2])
+
+    # Get the ouput layer names
+    layer_names = net.getLayerNames()
+    layer_names = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+
+    if video_path != '':
+        cap = cv2.VideoCapture(video_path)
+    else:
+        cap = cv2.VideoCapture(0)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    counter = 1
+
+    countlist = []
+    box_result = []
+    imgs = []
+    while cap.isOpened():
+        ret, image = cap.read()
+        if counter%fps==0:
+
+            if not ret:
+                print('Video file finished.')
+                break
+            #inprogress
+            boxes, confidences, classIDs, idxs = make_prediction(net, layer_names, labels, image, confidence, threshold)
+            
+            if boxes:
+                print(counter/60)
+                box_result.append(boxes)
+                countlist.append(int(counter/60))
+                #imgs.append(image)
+            if showvdo.get():
+                image = draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors)
+                cv2.imshow('YOLO Object Detection', image)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+            counter += 1
+        else:
+            counter += 1
+    print('end already')
+    cap.release()
+    cv2.destroyAllWindows()
+    return box_result,imgs,countlist
+
+if __name__ == '_____main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-w', '--weights', type=str, default='model/yolov3.weights', help='Path to model weights')
     parser.add_argument('-cfg', '--config', type=str, default='model/yolov3.cfg', help='Path to configuration file')
     parser.add_argument('-l', '--labels', type=str, default='model/coco.names', help='Path to label file')
-    parser.add_argument('-c', '--confidence', type=float, default=0.5, help='Minimum confidence for a box to be detected.')
+    parser.add_argument('-c', '--confidence', type =float, default=0.5, help='Minimum confidence for a box to be detected.')
     parser.add_argument('-t', '--threshold', type=float, default=0.3, help='Threshold for Non-Max Suppression')
     parser.add_argument('-u', '--use_gpu', default=False, action='store_true', help='Use GPU (OpenCV must be compiled for GPU). For more info checkout: https://www.pyimagesearch.com/2020/02/03/how-to-use-opencvs-dnn-module-with-nvidia-gpus-cuda-and-cudnn/')
     parser.add_argument('-s', '--save', default=False, action='store_true', help='Whether or not the output should be saved')
     parser.add_argument('-sh', '--show', default=True, action="store_false", help='Show output')
-
+ 
     input_group = parser.add_mutually_exclusive_group()
     input_group.add_argument('-i', '--image_path', type=str, default='', help='Path to the image file.')
     input_group.add_argument('-v', '--video_path', type=str, default='', help='Path to the video file.')
