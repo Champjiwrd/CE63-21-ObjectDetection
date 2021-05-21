@@ -343,7 +343,7 @@ if __name__ == '__main__':
     #ctx = mp.set_start_method('spawn')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-w', '--weights', type=str, default='cfg/custom-yolov4-detector_best.weights', help='Path to model weights')
+    parser.add_argument('-w', '--weights', type=str, default='yolov4_shirt.weights', help='Path to model weights')
     parser.add_argument('-cfg', '--config', type=str, default='cfg/yolov4-custom-shirt.cfg', help='Path to configuration file')
     parser.add_argument('-l', '--labels', type=str, default='cfg/justshirt.names', help='Path to label file')
     parser.add_argument('-c', '--confidence', type=float, default=0.5, help='Minimum confidence for a box to be detected.')
