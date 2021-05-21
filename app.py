@@ -357,7 +357,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     #parser.add_argument('-w', '--weights', type=str, default='cfg/custom-yolov4-detector_best.weights', help='Path to model weights')
-    parser.add_argument('-w', '--weights', type=str, default='cfg/yolov4-custom_best.weights', help='Path to model weights')
+    parser.add_argument('-w', '--weights', type=str, default='yolov4_shirt.weights', help='Path to model weights')
     parser.add_argument('-cfg', '--config', type=str, default='cfg/yolov4-custom-shirt.cfg', help='Path to configuration file')
     parser.add_argument('-l', '--labels', type=str, default='cfg/justshirt.names', help='Path to label file')
     parser.add_argument('-c', '--confidence', type=float, default=0.5, help='Minimum confidence for a box to be detected.')
@@ -390,7 +390,7 @@ if __name__ == '__main__':
 
     # Load weights using OpenCV
     config_person = "cfg/yolov4.cfg"
-    weights_person = "cfg/yolov4.weights"
+    weights_person = "yolov4.weights"
     net1 = cv2.dnn.readNetFromDarknet(config_person, weights_person)
     net2 = cv2.dnn.readNetFromDarknet(args.config, args.weights)
 
