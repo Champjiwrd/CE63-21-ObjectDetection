@@ -365,7 +365,7 @@ if __name__ == '__main__':
     parser.add_argument('-u', '--use_gpu', default=True, action='store_true', help='Use GPU (OpenCV must be compiled for GPU). For more info checkout: https://www.pyimagesearch.com/2020/02/03/how-to-use-opencvs-dnn-module-with-nvidia-gpus-cuda-and-cudnn/')
     parser.add_argument('-s', '--save', default=False, action='store_true', help='Whether or not the output should be saved')
     parser.add_argument('-sh', '--show', default=True, action="store_false", help='Show output')
-    parser.add_argument('-col', '--color', type=str, help="color > 'pink', 'purple', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'brown', 'white', 'black' ")
+    parser.add_argument('-col', '--color', type=str, help="color > 'pink','red','orange','yellow','green','blue','brown','white','black' ")
     parser.add_argument('-bag', '--bag', default=False, action="store_true", help='Filter Bag')
     parser.add_argument('-bi', '--bilayer', default=False, action="store_true", help='Detect in 2 layer model')
 
