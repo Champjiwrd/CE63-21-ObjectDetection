@@ -2,16 +2,22 @@ import numpy as np
 import argparse
 import cv2
 import os
-import time
 import colorsys
 import time
 import datetime
+from pathlib import Path
 
 #for share var
 import builtins
 from functools import partial
 #multiprocessing
 import multiprocessing as mp
+from multiprocessing import Manager
+from line_notify import LineNotify
+
+ACCESS_TOKEN = "zrs6CR00Pe8CO57XK16pl6ouJs1eqfGMqGCu4bN7byC"
+
+notify = LineNotify(ACCESS_TOKEN)
 
 class bcolors:
     HEADER = '\033[95m'
@@ -20,6 +26,9 @@ class bcolors:
     WARNING = '\033[93m'
     FAIL = '\033[91m'
     ENDC = '\033[0m'
+
+#l_color = ['pink', 'purple', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'brown', 'white', 'black']
+l_color = ['pink','red','orange','yellow','green','blue','brown','white','black']
 
 def extract_boxes_confidences_classids(outputs, confidence, width, height):
     boxes = []
@@ -66,6 +75,7 @@ def draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors):
                 cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
     return image
+
 def draw_bounding_boxes2(image, boxes, confidences, classIDs, idxs, colors):
     if len(idxs) > 0:
         for i in idxs.flatten():
@@ -80,6 +90,51 @@ def draw_bounding_boxes2(image, boxes, confidences, classIDs, idxs, colors):
                 text = "{}: {:.4f}".format("shirt", confidences[i])
                 #text = "{}: {:.4f}".format(labels1[classIDs[i]], confidences[i])
                 cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+    return image
+
+def draw_bounding_boxes3(image, boxes, confidences, classIDs, idxs, colors):
+    imgn = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
+    if len(idxs) > 0:
+        for i in idxs.flatten():
+            if labels2[classIDs[i]] == 'shirt':
+                # extract bounding box coordinates
+                x, y = boxes[i][0], boxes[i][1]
+                w, h = boxes[i][2], boxes[i][3]
+
+                # change into 70% w/h scale
+                wn, hn = int(0.7*w), int(0.7*h)
+                xn, yn = int(x+w/2-wn/2), int(y+h/2-hn/2)
+                w, h = int(0.7*w), int(0.7*h)
+                x, y = int(x+w/2-wn/2), int(y+h/2-hn/2)
+
+                red, green, blue = 0, 0, 0
+                for width in range(xn, xn+wn):
+                    for height in range(yn, yn+hn):
+                        #rgb_pixel_value = img.getpixel((x+width ,y+height))
+                        r, g, b = imgn[height][width][0], \
+                        imgn[height][width][1], imgn[height][width][2]
+                        red += r
+                        green += g
+                        blue += b
+
+                        #print(width, height)
+                red = int(red/(w*h))
+                green = int(green/(w*h))
+                blue = int(blue/(w*h))
+                
+                color = nearest_colour_hsv(red, green, blue)
+
+                if l_color[color] == args.color:
+
+                    # draw the bounding box and label on the image
+                    color = [int(c) for c in colors[classIDs[i]]]
+                    x, y = boxes[i][0], boxes[i][1]
+                    w, h = boxes[i][2], boxes[i][3]
+                    cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+                    text = "{} {}: {:.4f}".format(args.color,"shirt", confidences[i])
+                    #text = "{}: {:.4f}".format(labels1[classIDs[i]], confidences[i])
+                    cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
     return image
 
@@ -99,66 +154,49 @@ def make_prediction(net, layer_names, labels, image, confidence, threshold):
 
     return boxes, confidences, classIDs, idxs
 
-def nearest_colour(r, g, b):
-  l = []
-  #            0        1        2       3         4         5       6       7        8        9       10 
-  l_color = ['pink', 'purple', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'brown', 'white', 'black']
-  l_scale = [(100,0,100),(100,75,80),(100,41,71),(100,8,58)\
-             ,(50,0,50),(87,63,87),(73,33,83),(29,0,51)\
-             ,(100,0,0),(100,63,45),(80,36,36),(55,0,0),\
-             (100,27,0),(100,50,31),(100,27,0),(100,55,0),\
-             (100,100,0),(100,100,88),(94,90,55),(100,89,55),\
-             (0,50,0),(49,99,0),(13,55,13),(42,56,14),\
-             (0,100,100),(88,100,100),(25,88,82),(0,55,55),\
-             (0,0,100),(69,88,90),(0,75,100),(10,10,44),\
-             (50,0,0),(87,72,53),(82,41,12),(55,27,7),\
-             (100,100,100),(94,100,94),(96,96,86),(98,94,90),\
-             (0,0,0),(41,41,41),(75,75,75),(50,50,50)]
-  r, g, b = int(r*100/255), int(g*100/255), int(b*100/255)
-  # calculate absolute distance
-  for ele in l_scale:
-    r0, g0, b0 = ele
-    l.append(int(0.299*0.299*(r-r0)*(r-r0)+0.587*0.587*(g-g0)*(g-g0)+0.114*0.114*(b-b0)*(b-b0)))
-  color = l_color[l.index(min(l))//4]
-  return color
-
 def nearest_colour_hsv(r, g, b):
         h, s, v = colorsys.rgb_to_hsv(r,g,b)
-        l = []
-        #            0        1        2       3         4         5       6       7        8        9       10 
-        l_color = ['pink', 'purple', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'brown', 'white', 'black']
-        l_scale = [(100,0,100),(100,75,80),(100,41,71),(100,8,58)\
-                    ,(50,0,50),(87,63,87),(73,33,83),(29,0,51)\
-                    ,(100,0,0),(100,63,45),(80,36,36),(55,0,0),\
-                    (100,27,0),(100,50,31),(100,27,0),(100,55,0),\
-                    (100,100,0),(100,100,88),(94,90,55),(100,89,55),\
-                    (0,50,0),(49,99,0),(13,55,13),(42,56,14),\
-                    (0,100,100),(88,100,100),(25,88,82),(0,55,55),\
-                    (0,0,100),(69,88,90),(0,75,100),(10,10,44),\
-                    (50,0,0),(87,72,53),(82,41,12),(55,27,7),\
-                    (100,100,100),(94,100,94),(96,96,86),(98,94,90),\
-                    (0,0,0),(41,41,41),(75,75,75),(50,50,50)]
-        # calculate absolute distance
-        for ele in l_scale:
-            r0, g0, b0 = ele
-            h0, s0, v0 = colorsys.rgb_to_hsv(r0,g0,b0)
-            dh = (min(abs(h-h0), 360-abs(h-h0)) / 180.0)*360
-            ds = abs(s-s0)
-            dv = abs(v-v0) / 255.0
-            distance = dh*dh+ds*ds+dv*dv
-            l.append(distance)
-        #print(l)
-        color = l.index(min(l))//4
+
+        pink = [(199,21,133),(255,20,147),(219,112,147),(255,105,180)]
+        red = [(130,55,55),(123,51,57),(139,0,0),(255,0,0),(178,34,34),(220,20,60),(205,92,92),(170,57,65)]
+        orange = [(217,103,62),(121,80,54),(122,81,55),(194,105,84),(255,69,0),(255,99,71),(255,140,0),(255,127,80),(255,165,0)]
+        yellow = [(205,227,62),(255,215,0),(255,255,0),(240,230,140),(255,250,205),(189,183,107)]
+        brown = [(136,90,72),(156,101,73),(128,0,0),(165,42,42),(139,69,19),(160,82,45),(210,105,30),(184,134,11),\
+            (205,133,63),(188,143,143),(218,165,32),(244,164,96)] # not all
+        green = [(93,131,101),(101,141,106),(173,255,47),(127,255,0),(124,252,0),(0,255,0),(50,205,50),(152,251,152),\
+            (0,250,154),(0,255,127),(0,128,0),(0,100,0)]
+        blue = [(52,91,94),(86,134,141),(60,70,113),(0,0,128),(0,0,139),(0,0,205),(0,0,255),\
+            (65,105,225),(100,149,237),(30,144,255),(0,191,255),(135,206,250),(173,216,230),\
+                (176,196,222),(70,130,180),(0,206,209),(0,255,255),(175,238,238),(64,224,208)]
+        white = [(255,255,255),(255,250,250),(240,255,240),(245,255,250),(240,248,255),\
+            (245,245,245),(255,240,245),(204,211,230)]
+        black = [(0,0,0),(47,79,79),(105,105,105),(112,128,144),(128,128,128),(169,169,169),\
+            (192,192,192)]
+        listColor = [pink,red,orange,yellow,green,blue,brown,white,black]
+        listDistance = []
+        for color in listColor:
+            listinColor = []
+            for ele in color:
+                r0, g0, b0 = ele
+                h0, s0, v0 = colorsys.rgb_to_hsv(r0,g0,b0)
+                dh = (min(abs(h-h0), 360-abs(h-h0)) / 180.0)*360
+                ds = abs(s-s0)
+                dv = abs(v-v0) / 255.0
+                distance = dh*dh+ds*ds+dv*dv
+                listinColor.append(distance)
+            listDistance.append(min(listinColor))
+            #listDistance.append(tmp)
+        color = listDistance.index(min(listDistance))
+        #print(r,g,b,l_color[color])
+        
         return color
 
 def classifyColor(img, boxes, idxs):
-    numColor = 11
-    l = [0]*numColor
     # cvt BGR to RGB
     imgn = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
     #            0        1        2       3         4         5       6       7        8        9       10 
-    l_color = ['pink', 'purple', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'brown', 'white', 'black']
     #l_color = ['pink','red','orange','yellow','brown','green','blue','white','black']
+    l = [0]*len(l_color)
     if len(idxs) > 0:
         for i in idxs.flatten():\
             #print('number of bbox', i)
@@ -172,10 +210,6 @@ def classifyColor(img, boxes, idxs):
             xn, yn = int(x+w/2-wn/2), int(y+h/2-hn/2)
             w, h = int(0.7*w), int(0.7*h)
             x, y = int(x+w/2-wn/2), int(y+h/2-hn/2)
-
-            #print('start-end x', xn, xn+wn)
-            #print('start-end y', yn, yn+hn)
-            #print(img.shape)
 
             red, green, blue = 0, 0, 0
             for width in range(xn, xn+wn):
@@ -191,7 +225,9 @@ def classifyColor(img, boxes, idxs):
             red = int(red/(w*h))
             green = int(green/(w*h))
             blue = int(blue/(w*h))
+            
             color = nearest_colour_hsv(red, green, blue)
+
             if l[color] == 0:
                 l[color] = 1
             #print(l)
@@ -226,7 +262,6 @@ def vdoprocess(vidpath,args):
     f_len = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     fps = cap.get(cv2.CAP_PROP_FPS)
     vdo_l = f_len//fps
-
     #print('start of process',os.getpid(),vidpath,'video length',datetime.timedelta(seconds=vdo_l))
 
     counter = 1
@@ -235,42 +270,33 @@ def vdoprocess(vidpath,args):
     bagInFrame = ''
     start_t = time.process_time()
 
+
     l_color = ['pink','red','orange','yellow','brown','green','blue','white','black']
-    l_color = ['pink', 'purple', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'brown', 'white', 'black']
     while cap.isOpened():
         ret, image = cap.read()
         if not ret:
             end_t = time.process_time()
             disp = return_vidsNameAndTime(isInFrame)
             if disp != None:
+                found_video.append(vidpath)
+                print(found_video)
                 print(f"{bcolors.OKBLUE}# Video Name: {vidpath} {bcolors.ENDC}\nVideo length: {datetime.timedelta(seconds=vdo_l)} \nIn frame: {bcolors.OKGREEN}{disp}{bcolors.ENDC}")
-        
                 if args.bag:
+                    notify.send(f"\nVideo Name: *{vidpath}* \nVideo length: {datetime.timedelta(seconds=vdo_l)} \n{args.color} shirt in frame: {disp}\nBag in frame: {return_vidsNameAndTime(bagInFrame)}\nElapsed time:{datetime.timedelta(seconds=end_t - start_t)}\n")
                     print(f"Bag in frame: {bcolors.OKGREEN}{return_vidsNameAndTime(bagInFrame)}{bcolors.ENDC}")
+                else:
+                    notify.send(f"\n********************\nVideo Name: *{vidpath}* \nVideo length: {datetime.timedelta(seconds=vdo_l)} \n{args.color} shirt in frame: `{disp}` \nElapsed time:{datetime.timedelta(seconds=end_t - start_t)}")
                 print('Elapsed time:', datetime.timedelta(seconds=end_t - start_t))
 
             else :
                 print(f"{bcolors.OKBLUE}# Video Name: {vidpath} {bcolors.ENDC}\nVideo length: {datetime.timedelta(seconds=vdo_l)} \nIn frame: {bcolors.FAIL}Not Found{bcolors.ENDC} \nElapsed time: {datetime.timedelta(seconds=end_t - start_t)}")
-        
+                notify.send(f"\nVideo Name: *{vidpath}* \nVideo length: {datetime.timedelta(seconds=vdo_l)} \n{args.color} shirt in frame: Not Found \nElapsed time: {datetime.timedelta(seconds=end_t - start_t)}")
             break
-        if counter%fps == 0:
+
+        if counter%int(fps) == 0 :
                 
-                fnum+=1
-                '''
-                if args.bag and args.col == None :
-                    boxes, confidences, classIDs, idxs = make_prediction(net1, layer_names1, labels1, image, args.confidence, args.threshold)
-                    if checkBag(boxes, idxs,classIDs):
-                            bagInFrame += '1'
-                    else:
-                            bagInFrame += '0'
-                else:'''
-                #inference
-
-
                 boxes, confidences, classIDs, idxs = make_prediction(net2, layer_names2, labels2, image, args.confidence, args.threshold)
-                
-            
-                #image_bb = draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors)
+
                 l = classifyColor(image, boxes, idxs)
                 if (l[l_color.index(args.color)]==1):
                     isInFrame += '1'
@@ -286,25 +312,12 @@ def vdoprocess(vidpath,args):
                     isInFrame += '0'
                     bagInFrame += '0'
 
-            #print(vidpath+', frame number ', fnum, l)
-            #print('elapsed time = ', end - start)
-
-
         counter+=1
     cap.release()
 
-    # show the output image
-    if args.show:
-        #cv2.imshow('YOLO Object Detection', image_bb)
-        #cv2.waitKey(0)
-        pass
-
-    if args.save:
-        #cv2.imwrite(f'output/{args.image_path.split("/")[-1]}', image_bb)
-        pass
-
     print('Done of process:',os.getpid())
     print()
+    return found_video
 
 # Detect Person first then detect shirt
 def personDetection(net1,net2, layer_names1, layer_names2, labels1,labels2, image, confidence, threshold ):
@@ -343,12 +356,13 @@ if __name__ == '__main__':
     #ctx = mp.set_start_method('spawn')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-w', '--weights', type=str, default='yolov4_shirt.weights', help='Path to model weights')
+    #parser.add_argument('-w', '--weights', type=str, default='cfg/custom-yolov4-detector_best.weights', help='Path to model weights')
+    parser.add_argument('-w', '--weights', type=str, default='cfg/yolov4-custom_best.weights', help='Path to model weights')
     parser.add_argument('-cfg', '--config', type=str, default='cfg/yolov4-custom-shirt.cfg', help='Path to configuration file')
     parser.add_argument('-l', '--labels', type=str, default='cfg/justshirt.names', help='Path to label file')
     parser.add_argument('-c', '--confidence', type=float, default=0.5, help='Minimum confidence for a box to be detected.')
     parser.add_argument('-t', '--threshold', type=float, default=0.3, help='Threshold for Non-Max Suppression')
-    parser.add_argument('-u', '--use_gpu', default=False, action='store_true', help='Use GPU (OpenCV must be compiled for GPU). For more info checkout: https://www.pyimagesearch.com/2020/02/03/how-to-use-opencvs-dnn-module-with-nvidia-gpus-cuda-and-cudnn/')
+    parser.add_argument('-u', '--use_gpu', default=True, action='store_true', help='Use GPU (OpenCV must be compiled for GPU). For more info checkout: https://www.pyimagesearch.com/2020/02/03/how-to-use-opencvs-dnn-module-with-nvidia-gpus-cuda-and-cudnn/')
     parser.add_argument('-s', '--save', default=False, action='store_true', help='Whether or not the output should be saved')
     parser.add_argument('-sh', '--show', default=True, action="store_false", help='Show output')
     parser.add_argument('-col', '--color', type=str, help="color > 'pink', 'purple', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'brown', 'white', 'black' ")
@@ -372,6 +386,7 @@ if __name__ == '__main__':
 
     print('Load Network...')
     start_time = time.time()
+    print(args.weights)
 
     # Load weights using OpenCV
     config_person = "cfg/yolov4.cfg"
@@ -390,8 +405,6 @@ if __name__ == '__main__':
         print('Creating output directory if it doesn\'t already exist')
         os.makedirs('output', exist_ok=True)
 
-    
-    
     # Get the ouput layer names
     layer_names1 = net1.getLayerNames()
     layer_names1 = [layer_names1[i[0] - 1] for i in net1.getUnconnectedOutLayers()]
@@ -402,16 +415,11 @@ if __name__ == '__main__':
     
     print('-------------------------------------------------------------------------')
 
-    '''
-    image = cv2.imread(args.image_path)
-    boxes, confidences, classIDs, idxs = make_prediction(net, layer_names, labels, image, args.confidence, args.threshold)
-    l = classifyColor(image, boxes, idxs)
-    image = draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors)
-    '''
-
     print('Detect \"{}\" shirt and bag'.format(args.color)) if args.bag else print('Detect \"{}\" shirt'.format(args.color))
 
+    
     if args.video_path != '':
+        notify.send(f"\n--Start Detect {args.color} shirt--\nIn video path: {args.video_path}")
         cap = cv2.VideoCapture(args.video_path)
         f_len = cap.get(cv2.CAP_PROP_FRAME_COUNT)
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -425,8 +433,13 @@ if __name__ == '__main__':
         bagInFrame = ''
         start_t = time.process_time()
 
-        l_color = ['pink','red','orange','yellow','brown','green','blue','white','black']
-        l_color = ['pink', 'purple', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'brown', 'white', 'black']
+        if args.save:
+            width = int(cap.get(3))
+            height = int(cap.get(4))
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            name = args.video_path.split("/")[-1].split('.')[0]+'.avi'
+            out = cv2.VideoWriter(f'output/{name}', fourcc, 1, (width, height))
+        
         while cap.isOpened():
             ret, image = cap.read()
             if not ret:
@@ -434,40 +447,33 @@ if __name__ == '__main__':
                 disp = return_vidsNameAndTime(isInFrame)
                 if disp != None:
                     print(f"{bcolors.OKBLUE}# Video Name: {args.video_path} {bcolors.ENDC}\nVideo length: {datetime.timedelta(seconds=vdo_l)} \nIn frame: {bcolors.OKGREEN}{disp}{bcolors.ENDC}")
-            
+
                     if args.bag:
                         print(f"Bag in frame: {bcolors.OKGREEN}{return_vidsNameAndTime(bagInFrame)}{bcolors.ENDC}")
+                        notify.send(f"\nVideo Name: *{args.video_path}* \nVideo length: {datetime.timedelta(seconds=vdo_l)} \n{args.color} shirt in frame: {disp}\nBag in frame: {return_vidsNameAndTime(bagInFrame)}\nElapsed time:{datetime.timedelta(seconds=end_t - start_t)}")
+                    else:
+                        notify.send(f"\n********************\nVideo Name: *{args.video_path}* \nVideo length: {datetime.timedelta(seconds=vdo_l)} \n{args.color} shirt in frame: `{disp}` \nElapsed time:{datetime.timedelta(seconds=end_t - start_t)}")
+                
                     print('Elapsed time:', datetime.timedelta(seconds=end_t - start_t))
 
                 else :
                     print(f"{bcolors.OKBLUE}# Video Name: {args.video_path} {bcolors.ENDC}\nVideo length: {datetime.timedelta(seconds=vdo_l)} \nIn frame: {bcolors.FAIL}Not Found{bcolors.ENDC} \nElapsed time: {datetime.timedelta(seconds=end_t - start_t)}")
-            
+                    notify.send(f"\nVideo Name: *{args.video_path}* \nVideo length: {datetime.timedelta(seconds=vdo_l)} \n{args.color} shirt in frame: Not Found \nElapsed time: {datetime.timedelta(seconds=end_t - start_t)}")
+
                 break
-            if counter%fps == 0:
+            if counter%int(fps) == 0:
                     
                     fnum+=1
-                    '''
-                    if args.bag and args.col == None :
-                        boxes, confidences, classIDs, idxs = make_prediction(net1, layer_names1, labels1, image, args.confidence, args.threshold)
-                        if checkBag(boxes, idxs,classIDs):
-                                bagInFrame += '1'
-                        else:
-                                bagInFrame += '0'
-                    else:'''
-                    #inference
-
 
                     boxes, confidences, classIDs, idxs = make_prediction(net2, layer_names2, labels2, image, args.confidence, args.threshold)
                     
-                
-                    #image_bb = draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors)
                     l = classifyColor(image, boxes, idxs)
                     if (l[l_color.index(args.color)]==1):
                         isInFrame += '1'
                         if args.bag:
-                            boxes, confidences, classIDs, idxs = make_prediction(net1, layer_names1, labels1, image, args.confidence, args.threshold)
-
-                            if checkBag(boxes, idxs,classIDs):
+                            boxes2, confidences2, classIDs2, idxs2 = make_prediction(net1, layer_names1, labels1, image, args.confidence, args.threshold)
+                            
+                            if checkBag(boxes2, idxs2,classIDs2):
                                 bagInFrame += '1'
                             else:
                                 bagInFrame += '0'
@@ -476,92 +482,78 @@ if __name__ == '__main__':
                         isInFrame += '0'
                         bagInFrame += '0'
 
-                #print(vidpath+', frame number ', fnum, l)
-                #print('elapsed time = ', end - start)
-
+                    if args.save:
+                        image_bb = draw_bounding_boxes3(image, boxes, confidences, classIDs, idxs, colors)
+                        out.write(image)
 
             counter+=1
         cap.release()
 
-        # show the output image
-        if args.show:
-            #cv2.imshow('YOLO Object Detection', image_bb)
-            #cv2.waitKey(0)
-            pass
-
-        if args.save:
-            #cv2.imwrite(f'output/{args.image_path.split("/")[-1]}', image_bb)
-            pass
-
         print('Done of process:',os.getpid())
         print()
 
-    if args.save:
-        width = int(cap.get(3))
-        height = int(cap.get(4))
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        name = args.video_path.split("/")[-1] if args.video_path else 'camera.avi'
-        out = cv2.VideoWriter(f'output/{name}', cv2.VideoWriter_fourcc('M','J','P','G'), fps, (width, height))
-
     if args.videoes_path != '': # run for vids in dir
-
+        notify.send(f"\n--Start Detect {args.color} shirt--\nDirectory Path: {args.videoes_path}")
         #get all the file
         vdo_list = []
         
-
+        found_video = Manager().list()
+        
         for vidpath in [vid for vid in os.listdir(args.videoes_path)]:
             if vidpath.endswith(('.mp4',".MOV",'.avi')):
                 vdo_list.append(vidpath)
 
-        l_color = ['pink', 'purple', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'brown', 'white', 'black']
-
+        
         print(vdo_list)
         print('Number of CPU :',mp.cpu_count())
         pool = mp.Pool(processes = mp.cpu_count())
         pool.map_async(partial(vdoprocess, args=args),vdo_list)
-
+ 
         pool.close()
         pool.join()
+        print(f"Found {args.color} shirt in: {found_video}")
+        notify.send(f'\nFound {args.color} shirt in: `{found_video}` ')
 
     if args.image_path != '':
+        notify.send(f"\n--Start Detect {args.color} shirt--\nIn image path: {args.image_path}")
         image = cv2.imread(args.image_path)
-
-        if args.bag and args.color == None :
-            boxes, confidences, classIDs, idxs = make_prediction(net1, layer_names1, labels1, image, args.confidence, args.threshold)
             
         # Load weights using OpenCV
         start_time = time.time()
         #boxes, confidences, classIDs, idxs = make_prediction(net1, layer_names1, labels1, image, args.confidence, args.threshold) # Detect from yolov4.weight 
-        if args.bilayer:
-            boxes, confidences, classIDs, idxs, bag = personDetection(net1,net2,layer_names1,layer_names2,labels1,labels2,image,args.confidence,args.threshold) # Detect from yolo then detect shirt
-            image = draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors) # make_prediction, personDetection
+
+        boxes, confidences, classIDs, idxs = make_prediction(net2, layer_names2, labels2, image, args.confidence, args.threshold) # Detect from shirt weight
+        #image = draw_bounding_boxes2(image, boxes, confidences, classIDs, idxs, colors)
+        image = draw_bounding_boxes3(image, boxes, confidences, classIDs, idxs, colors)
+
         
-        else:
-
-            boxes, confidences, classIDs, idxs = make_prediction(net2, layer_names2, labels2, image, args.confidence, args.threshold) # Detect from shirt weight
-            image = draw_bounding_boxes2(image, boxes, confidences, classIDs, idxs, colors)
-
-        l_color = ['pink', 'purple', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'brown', 'white', 'black']
-
         l = classifyColor(image, boxes, idxs)
+        print(f"Process time: {(time.time()-start_time)}")
+        #print(l)
         if (l[l_color.index(args.color)]==1):
-            print(f"{bcolors.OKGREEN}Found {args.color} shirt {bcolors.ENDC}")
+            if args.bag:
+                boxes2, confidences2, classIDs2, idxs2 = make_prediction(net1, layer_names1, labels1, image, args.confidence, args.threshold)  
+                print(f"{bcolors.OKGREEN}{args.color} shirt: Found {bcolors.ENDC}")
+                if checkBag(boxes2, idxs2,classIDs2):
+                    notify.send(f"\nFrom {args.image_path}\n{args.color} shirt: Found\nBag: Found")
+                    print(f"{bcolors.OKGREEN}Bag: Found {bcolors.ENDC}")
+                else:
+                    notify.send(f"\nFrom {args.image_path}\n{args.color} shirt: Found\nBag: Not Found")
+                    print(f"{bcolors.FAIL}Bag: Not Found {bcolors.ENDC}")
+            else:
+
+                print(f"{bcolors.OKGREEN}Found {args.color} shirt {bcolors.ENDC}")
+                notify.send(f"\nFrom {args.image_path}\nFound {args.color} shirt ")
         else:
             print(f"{bcolors.FAIL}Not Found {args.color} shirt {bcolors.ENDC}")
+            notify.send(f"\nFrom {args.image_path}\nNot Found {args.color} shirt ")
+            
 
         #print('Bag: {}'.format(bag))
-        #l = intregratedColor(l)
-        print(f"Process time: {(time.time()-start_time)}")
-        # show the output image
-        if args.show:
-            
-            cv2.imshow('YOLO Object Detection', image)
-            
-            cv2.waitKey(0)
         
-        if args.save:
-            cv2.imwrite(f'output/{args.image_path.split("/")[-1]}', image)
-
-
-    #cv2.destroyAllWindows()
-
+        # show the output image
+        path = str(Path(args.image_path).parent.absolute()) +'\prediction.jpg'
+        cv2.imwrite(path, image)
+        notify.send("image",image_path=path)
+        
+    notify.send(f"\n--Finish Detect {args.color} shirt--")
