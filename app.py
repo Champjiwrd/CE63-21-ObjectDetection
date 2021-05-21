@@ -535,18 +535,18 @@ if __name__ == '__main__':
                 boxes2, confidences2, classIDs2, idxs2 = make_prediction(net1, layer_names1, labels1, image, args.confidence, args.threshold)  
                 print(f"{bcolors.OKGREEN}{args.color} shirt: Found {bcolors.ENDC}")
                 if checkBag(boxes2, idxs2,classIDs2):
-                    notify.send(f"\nFrom {args.image_path}\n{args.color} shirt: Found\nBag: Found")
+                    notify.send(f"\nFrom {args.image_path}\n{args.color} `shirt: Found`\n`Bag: Found`")
                     print(f"{bcolors.OKGREEN}Bag: Found {bcolors.ENDC}")
                 else:
-                    notify.send(f"\nFrom {args.image_path}\n{args.color} shirt: Found\nBag: Not Found")
+                    notify.send(f"\nFrom {args.image_path}\n{args.color} `shirt: Found`\n`Bag: Not Found`")
                     print(f"{bcolors.FAIL}Bag: Not Found {bcolors.ENDC}")
             else:
 
                 print(f"{bcolors.OKGREEN}Found {args.color} shirt {bcolors.ENDC}")
-                notify.send(f"\nFrom {args.image_path}\nFound {args.color} shirt ")
+                notify.send(f"\nFrom {args.image_path}\n`Found {args.color} shirt` ")
         else:
             print(f"{bcolors.FAIL}Not Found {args.color} shirt {bcolors.ENDC}")
-            notify.send(f"\nFrom {args.image_path}\nNot Found {args.color} shirt ")
+            notify.send(f"\nFrom {args.image_path}\n`Not Found {args.color} shirt` ")
             
 
         #print('Bag: {}'.format(bag))
